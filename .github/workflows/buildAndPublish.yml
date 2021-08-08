@@ -79,19 +79,28 @@ jobs:
         path: output/windows
 
   create-release:
-    runs-on: windows-latest
+    runs-on: ubuntu-latest
     needs: [ubuntu-build, macos-build, windows-build]
     steps:
     - name: Download all workflow run artifacts
       uses: actions/download-artifact@v2
-      
+
+    - name: Zip windows artifacts
+      run: zip -r windows.zip windows
+
+    - name: Zip ubuntu artifacts
+      run: zip -r ubuntu.zip ubuntu
+
+    - name: Zip macos artifacts
+      run: zip -r macos.zip macos
+
     - name: Create release
       uses: ncipollo/release-action@v1.8.6
       with:
         artifacts: |
-          windows,
-          ubuntu,
-          macos
+          windows.zip,
+          ubuntu.zip,
+          macos.zip
         tag: "${{ github.run_number }}"
         name: "Development release #${{ github.run_number }}"
         token: ${{ secrets.GITHUB_TOKEN }}
