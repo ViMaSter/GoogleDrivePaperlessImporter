@@ -21,6 +21,12 @@ jobs:
       
     - name: Publish
       run: dotnet publish -o output/ubuntu
+
+    - name: Upload build artifact
+      uses: actions/upload-artifact@v2
+      with:
+        name: ubuntu
+        path: output/ubuntu
         
   macos-build:
     runs-on: macos-latest
@@ -40,6 +46,12 @@ jobs:
       
     - name: Publish
       run: dotnet publish -o output/macos
+
+    - name: Upload build artifact
+      uses: actions/upload-artifact@v2
+      with:
+        name: macos
+        path: output/macos
         
   windows-build:
     runs-on: windows-latest
@@ -60,6 +72,12 @@ jobs:
     - name: Publish
       run: dotnet publish -o output/windows
 
+    - name: Upload build artifact
+      uses: actions/upload-artifact@v2
+      with:
+        name: windows
+        path: output/windows
+
   create-release:
     runs-on: windows-latest
     needs: [ubuntu-build, macos-build, windows-build]
@@ -67,9 +85,9 @@ jobs:
     - uses: ncipollo/release-action@v1.8.6
       with:
         artifacts: |
-          output/windows,
-          output/ubuntu,
-          output/macos
+          windows,
+          ubuntu,
+          macos
         tag: "${{ github.run_number }}"
         name: "Development release #${{ github.run_number }}"
         token: ${{ secrets.GITHUB_TOKEN }}
