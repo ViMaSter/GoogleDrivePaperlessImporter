@@ -61,7 +61,7 @@ jobs:
       run: dotnet publish -o output/windows
 
   create-release:
-    needs: ubuntu-build, macos-build, windows-build
+    needs: [ubuntu-build, macos-build, windows-build]
     runs-on: windows-latest
     - uses: ncipollo/release-action@v1.8.6
       with:
