@@ -20,13 +20,13 @@ jobs:
       run: dotnet build --configuration Release --no-restore
       
     - name: Publish
-      run: dotnet publish
+      run: dotnet publish -o output/ubuntu
 
     - name: Upload build artifact
       uses: actions/upload-artifact@v2
       with:
         name: ubuntu
-        path: bin/publish/
+        path: output/ubuntu
         
   macos-build:
     runs-on: macos-latest
@@ -45,13 +45,13 @@ jobs:
       run: dotnet build --configuration Release --no-restore
       
     - name: Publish
-      run: dotnet publish
+      run: dotnet publish -o output/macos
 
     - name: Upload build artifact
       uses: actions/upload-artifact@v2
       with:
         name: macos
-        path: bin/publish/
+        path: output/macos
         
   windows-build:
     runs-on: windows-latest
@@ -62,7 +62,7 @@ jobs:
       uses: actions/setup-dotnet@v1
       with:
         dotnet-version: 5.0.x
-         
+
     - name: Install dependencies
       run: dotnet restore
       
@@ -70,10 +70,10 @@ jobs:
       run: dotnet build --configuration Release --no-restore
       
     - name: Publish
-      run: dotnet publish
+      run: dotnet publish -o output/windows
 
     - name: Upload build artifact
       uses: actions/upload-artifact@v2
       with:
         name: windows
-        path: bin/publish/
+        path: output/windows
