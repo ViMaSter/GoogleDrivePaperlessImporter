@@ -5,7 +5,7 @@ Script that attempts to import all files inside a [Google Drive](https://drive.g
 # Setup
 1. Download binary or compile source
 2. Create a `config.json` in the working directory of your app containing the following:
-```
+```json
 {
   "paperless": {
     "absoluteInstanceURL": "", // absolute root URL of your paperless instance

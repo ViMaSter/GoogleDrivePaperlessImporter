@@ -387,5 +387,6 @@ FodyWeavers.xsd
 .idea/
 *.sln.iml
 
-## Project ##
+# Project-specific
 config.json
+googleCredentials
