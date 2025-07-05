@@ -7,13 +7,14 @@ using Google.Apis.Auth.OAuth2;
 using Google.Apis.Drive.v3;
 using Google.Apis.Services;
 using Google.Apis.Util.Store;
-using Newtonsoft.Json;
+using Serilog;
 using File = Google.Apis.Drive.v3.Data.File;
 
 namespace GoogleDrivePaperlessImporter.Modules
 {
     internal class GoogleDrive
     {
+        private readonly ILogger _logger;
         private readonly DriveService _driveService;
         private const string CREDENTIAL_PATH = "googleCredentials/token.json";
         private readonly UserCredential _credentials;
@@ -21,30 +22,29 @@ namespace GoogleDrivePaperlessImporter.Modules
         private void RefreshTokenIfRequired()
         {
             if (!_credentials.Token.IsStale) return;
-            Console.WriteLine("[GOOGLE] Refreshing token");
+            _logger.Information("Refreshing token");
             _credentials.RefreshTokenAsync(CancellationToken.None).Wait();
             // Persist the refreshed token
             using var stream = new FileStream(CREDENTIAL_PATH, FileMode.Create, FileAccess.Write);
             new FileDataStore(Path.GetDirectoryName(CREDENTIAL_PATH), true).StoreAsync("user", _credentials).Wait();
         }
 
-        public GoogleDrive()
+        public GoogleDrive(ILogger logger, GoogleOptions googleDriveConfig)
         {
+            _logger = logger;
             string[] scopes = { DriveService.Scope.Drive };
-            const string APPLICATION_NAME = "Drive API .NET Quickstart";
-            const string CONFIG_PATH = "config.json";
-            var googleDriveConfig = JsonConvert.DeserializeObject<dynamic>(System.IO.File.ReadAllText(CONFIG_PATH)).googleDrive.credentials.installed;
+            const string APPLICATION_NAME = "Google Drive Paperless Importer";
 
             var secrets = new ClientSecrets()
             {
-                ClientId = googleDriveConfig.client_id,
-                ClientSecret = googleDriveConfig.client_secret
+                ClientId = googleDriveConfig.credentials.installed.client_id,
+                ClientSecret = googleDriveConfig.credentials.installed.client_secret
             };
 
             var dataStore = new FileDataStore(Path.GetDirectoryName(CREDENTIAL_PATH), true);
 
             // Try to load existing credentials
-            Console.WriteLine("[GOOGLE] Authorizing...");
+            _logger.Information("Authorizing...");
             _credentials = GoogleWebAuthorizationBroker.AuthorizeAsync(
             secrets,
             scopes,
@@ -53,7 +53,7 @@ namespace GoogleDrivePaperlessImporter.Modules
             dataStore
             ).Result;
 
-            Console.WriteLine("[GOOGLE] Initializing Service...");
+            _logger.Information("Initializing Service...");
             _driveService = new DriveService(new BaseClientService.Initializer
             {
                 HttpClientInitializer = _credentials,

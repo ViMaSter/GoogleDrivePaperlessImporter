@@ -2,19 +2,22 @@
 using System.Threading.Tasks;
 using Google.Apis.Drive.v3.Data;
 using Newtonsoft.Json;
+using Serilog;
 
 namespace GoogleDrivePaperlessImporter.Modules
 {
     internal class Processor
     {
+        private readonly ILogger _logger;
         private readonly GoogleDrive _googleDrive;
         private readonly Paperless _paperless;
         private readonly File _sourceFolder;
         private readonly File _processingFolder;
         private readonly TimeSpan _pauseAfterCompletedList;
 
-        public Processor(GoogleDrive googleDrive, Paperless paperless)
+        public Processor(ILogger logger, GoogleDrive googleDrive, Paperless paperless, ProcessorOptions options)
         {
+            _logger = logger;
             _googleDrive = googleDrive;
             _paperless = paperless;
 
@@ -22,8 +25,7 @@ namespace GoogleDrivePaperlessImporter.Modules
             _processingFolder = _googleDrive.FindFile($"trashed = false AND name='processing' AND '{_googleDrive.FindFile("trashed = false AND name='paperless'").Id}' IN parents");
 
             const string CONFIG_PATH = "config.json";
-            var processorConfig = JsonConvert.DeserializeObject<dynamic>(System.IO.File.ReadAllText(CONFIG_PATH)).processor;
-            _pauseAfterCompletedList = TimeSpan.FromMinutes((double)processorConfig.pauseAfterCompletedListInMinutes);
+            _pauseAfterCompletedList = TimeSpan.FromMinutes((double)options.PauseAfterCompletedListInMinutes);
         }
 
         public bool HasFiles()
@@ -39,7 +41,8 @@ namespace GoogleDrivePaperlessImporter.Modules
             {
                 return false;
             }
-            Console.WriteLine("[GOOGLE] Found new file: " + newFile.Name);
+
+            _logger.Information("Found new file: {FileName}...", newFile.Name);
 
             _googleDrive.MoveFile(newFile, _sourceFolder, _processingFolder);
             return true;
@@ -49,7 +52,7 @@ namespace GoogleDrivePaperlessImporter.Modules
         {
             var nextFile = _googleDrive.FindFile($"trashed = false AND name!='processing' AND '{_processingFolder.Id}' IN parents");
             var stream = _googleDrive.GetFileContents(nextFile);
-            Console.WriteLine("[GOOGLE] Uploading to paperless: " + nextFile.Name);
+            _logger.Information("Uploading to paperless: {FileName}...", nextFile.Name);
             _paperless.PostFile(nextFile.Name, stream);
             _googleDrive.DeleteFile(nextFile);
         }
@@ -60,12 +63,12 @@ namespace GoogleDrivePaperlessImporter.Modules
             {
                 while (true)
                 {
-                    Console.WriteLine("[LOOP] Checking for new files...");
+                    _logger.Information("Checking for new files...");
                     while (HasFiles())
                     {
                         ProcessNextFile();
                     }
-                    Console.WriteLine("[LOOP] Next check at " + DateTime.Now.Add(_pauseAfterCompletedList).ToString("O"));
+                    _logger.Information("Next check at {Timestamp:yyyy-MM-dd HH:mm:ss.fff}", DateTime.Now.Add(_pauseAfterCompletedList));
                     Task.Delay((int)_pauseAfterCompletedList.TotalMilliseconds).Wait();
                 }
                 // ReSharper disable once FunctionNeverReturns Justification: Intended infinite loop
