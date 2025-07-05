@@ -388,5 +388,5 @@ FodyWeavers.xsd
 *.sln.iml
 
 # Project-specific
-config.json
+appsettings.json
 googleCredentials

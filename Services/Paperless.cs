@@ -5,27 +5,26 @@ using System.Net.Http;
 using System.Net.Http.Headers;
 using System.Text;
 using Newtonsoft.Json;
+using Serilog;
 
 namespace GoogleDrivePaperlessImporter.Modules
 {
     internal class Paperless
     {
+        private readonly ILogger _logger;
         private readonly HttpClient _client;
-        public Paperless()
+        
+        public Paperless(ILogger logger, PaperlessOptions options)
         {
-            const string CONFIG_PATH = "config.json";
-            var paperlessConfig = JsonConvert.DeserializeObject<dynamic>(File.ReadAllText(CONFIG_PATH)).paperless;
-            var absoluteInstanceURL = (string)paperlessConfig.absoluteInstanceURL;
-            var username = (string)paperlessConfig.username;
-            var password = (string)paperlessConfig.password;
-            _client = new HttpClient { BaseAddress = new Uri(absoluteInstanceURL) };
+            _logger = logger;
+            _client = new HttpClient { BaseAddress = new Uri(options.AbsoluteInstanceURL) };
             _client.DefaultRequestHeaders.Accept.Add(new MediaTypeWithQualityHeaderValue("application/json"));
 
-            Console.WriteLine("[PAPERLESS] Authorizing...");
+            _logger.Information("Authorizing...");
             var tokenResponse = _client.PostAsync("/api/token/", new StringContent(JsonConvert.SerializeObject(new Dictionary<string, string>()
             {
-                {"username", username},
-                {"password", password}
+                {"username", options.Username},
+                {"password", options.Password}
             }), Encoding.UTF8, "application/json")).Result;
             if (!tokenResponse.IsSuccessStatusCode)
             {
@@ -56,8 +55,10 @@ namespace GoogleDrivePaperlessImporter.Modules
                 }).Result;
                 if (message.IsSuccessStatusCode)
                 {
+                    _logger.Information("File {FileName} uploaded successfully.", fileName);
                     return;
                 }
+                _logger.Error("Failed to upload file {FileName}. Status code: {StatusCode} Content: {Content}", fileName, message.StatusCode, message.Content.ReadAsStringAsync().Result);
                 var content = message.StatusCode + ":" + message.Content.ReadAsStringAsync().Result;
                 File.WriteAllText("error-"+DateTimeOffset.Now.ToString("s").Replace(":", "-"), content);
                 throw new NotSupportedException(content);
