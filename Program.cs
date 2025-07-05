@@ -1,14 +1,17 @@
-﻿using GoogleDrivePaperlessImporter.Modules;
+﻿using System;
+using GoogleDrivePaperlessImporter.Modules;
 
 namespace GoogleDrivePaperlessImporter
 {
-    class Program
+    internal class Program
     {
-        static void Main(string[] args)
+        private static void Main(string[] args)
         {
+            Console.WriteLine("[CORE] Initializing...");
             var drive = new GoogleDrive();
             var paperless = new Paperless();
 
+            Console.WriteLine("[PROCESSOR] Starting...");
             var processor = new Processor(drive, paperless);
             processor.Run().Wait();
         }
