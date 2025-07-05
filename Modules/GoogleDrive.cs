@@ -1,51 +1,50 @@
-﻿using System.Diagnostics;
+﻿using System;
+using System.Diagnostics;
 using System.IO;
 using System.Linq;
 using System.Threading;
 using Google.Apis.Auth.OAuth2;
 using Google.Apis.Drive.v3;
+using Google.Apis.Services;
 using Google.Apis.Util.Store;
-using Google.Apis.Util;
 using Newtonsoft.Json;
 using File = Google.Apis.Drive.v3.Data.File;
 
 namespace GoogleDrivePaperlessImporter.Modules
 {
-    class GoogleDrive
+    internal class GoogleDrive
     {
         private readonly DriveService _driveService;
-        private readonly string _credentialPath = "googleCredentials/token.json";
-        private UserCredential _credentials;
+        private const string CREDENTIAL_PATH = "googleCredentials/token.json";
+        private readonly UserCredential _credentials;
 
-        private void RefreshTokenIfRequried()
+        private void RefreshTokenIfRequired()
         {
-            if (_credentials.Token.IsExpired(SystemClock.Default))
-            {
-                _credentials.RefreshTokenAsync(CancellationToken.None).Wait();
-                // Persist the refreshed token
-                using (var stream = new FileStream(_credentialPath, FileMode.Create, FileAccess.Write))
-                {
-                    new FileDataStore(Path.GetDirectoryName(_credentialPath), true).StoreAsync("user", _credentials).Wait();
-                }
-            }
+            if (!_credentials.Token.IsStale) return;
+            Console.WriteLine("[GOOGLE] Refreshing token");
+            _credentials.RefreshTokenAsync(CancellationToken.None).Wait();
+            // Persist the refreshed token
+            using var stream = new FileStream(CREDENTIAL_PATH, FileMode.Create, FileAccess.Write);
+            new FileDataStore(Path.GetDirectoryName(CREDENTIAL_PATH), true).StoreAsync("user", _credentials).Wait();
         }
 
         public GoogleDrive()
         {
             string[] scopes = { DriveService.Scope.Drive };
-            const string applicationName = "Drive API .NET Quickstart";
-            const string configPath = "config.json";
-            var googleDriveConfig = JsonConvert.DeserializeObject<dynamic>(System.IO.File.ReadAllText(configPath)).googleDrive;
+            const string APPLICATION_NAME = "Drive API .NET Quickstart";
+            const string CONFIG_PATH = "config.json";
+            var googleDriveConfig = JsonConvert.DeserializeObject<dynamic>(System.IO.File.ReadAllText(CONFIG_PATH)).googleDrive.credentials.installed;
 
-            ClientSecrets secrets = new ClientSecrets()
+            var secrets = new ClientSecrets()
             {
-            ClientId = googleDriveConfig.clientId,
-            ClientSecret = googleDriveConfig.clientSecret
+                ClientId = googleDriveConfig.client_id,
+                ClientSecret = googleDriveConfig.client_secret
             };
 
-            var dataStore = new FileDataStore(Path.GetDirectoryName(_credentialPath), true);
+            var dataStore = new FileDataStore(Path.GetDirectoryName(CREDENTIAL_PATH), true);
 
             // Try to load existing credentials
+            Console.WriteLine("[GOOGLE] Authorizing...");
             _credentials = GoogleWebAuthorizationBroker.AuthorizeAsync(
             secrets,
             scopes,
@@ -54,16 +53,17 @@ namespace GoogleDrivePaperlessImporter.Modules
             dataStore
             ).Result;
 
-            _driveService = new DriveService(new DriveService.Initializer
+            Console.WriteLine("[GOOGLE] Initializing Service...");
+            _driveService = new DriveService(new BaseClientService.Initializer
             {
-            HttpClientInitializer = _credentials,
-            ApplicationName = applicationName,
+                HttpClientInitializer = _credentials,
+                ApplicationName = APPLICATION_NAME,
             });
         }
 
         public File FindFile(string filter)
         {
-            RefreshTokenIfRequried();
+            RefreshTokenIfRequired();
             var listRequest = _driveService.Files.List();
             listRequest.PageSize = 10;
             listRequest.Q = filter;
@@ -73,10 +73,10 @@ namespace GoogleDrivePaperlessImporter.Modules
 
         public File MoveFile(File file, File sourceFolder, File targetFolder)
         {
-            RefreshTokenIfRequried();
+            RefreshTokenIfRequired();
             var fileID = file.Id;
-            
-            var update = _driveService.Files.Update(new(), fileID);
+
+            var update = _driveService.Files.Update(new File(), fileID);
             update.AddParents = targetFolder.Id;
             update.RemoveParents = sourceFolder.Id;
             return update.Execute();
@@ -84,12 +84,12 @@ namespace GoogleDrivePaperlessImporter.Modules
 
         public Stream GetFileContents(File file)
         {
-            RefreshTokenIfRequried();
+            RefreshTokenIfRequired();
             var request = _driveService.Files.Get(file.Id);
             request.ModifyRequest = message =>
             {
-                Debug.Assert(message.RequestUri != null, "message.RequestUri != null");
-                message.RequestUri = new(message.RequestUri.AbsoluteUri + "?alt=media");
+                Debug.Assert(message.RequestUri != null);
+                message.RequestUri = new Uri(message.RequestUri.AbsoluteUri + "?alt=media");
             };
             return request.ExecuteAsStream();
         }
@@ -99,7 +99,7 @@ namespace GoogleDrivePaperlessImporter.Modules
             var response = _driveService.Files.Delete(file.Id).Execute();
             if (!string.IsNullOrWhiteSpace(response))
             {
-                throw new($"Deleting file '{file.Id}' failed: '{response}'");
+                throw new Exception($"Deleting file '{file.Id}' failed: '{response}'");
             }
         }
     }

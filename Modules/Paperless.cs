@@ -2,6 +2,7 @@
 using System.Collections.Generic;
 using System.IO;
 using System.Net.Http;
+using System.Net.Http.Headers;
 using System.Text;
 using Newtonsoft.Json;
 
@@ -12,14 +13,15 @@ namespace GoogleDrivePaperlessImporter.Modules
         private readonly HttpClient _client;
         public Paperless()
         {
-            const string configPath = "config.json";
-            var paperlessConfig = JsonConvert.DeserializeObject<dynamic>(File.ReadAllText(configPath)).paperless;
+            const string CONFIG_PATH = "config.json";
+            var paperlessConfig = JsonConvert.DeserializeObject<dynamic>(File.ReadAllText(CONFIG_PATH)).paperless;
             var absoluteInstanceURL = (string)paperlessConfig.absoluteInstanceURL;
             var username = (string)paperlessConfig.username;
             var password = (string)paperlessConfig.password;
-            _client = new() { BaseAddress = new(absoluteInstanceURL) };
-            _client.DefaultRequestHeaders.Accept.Add(new("application/json"));
+            _client = new HttpClient { BaseAddress = new Uri(absoluteInstanceURL) };
+            _client.DefaultRequestHeaders.Accept.Add(new MediaTypeWithQualityHeaderValue("application/json"));
 
+            Console.WriteLine("[PAPERLESS] Authorizing...");
             var tokenResponse = _client.PostAsync("/api/token/", new StringContent(JsonConvert.SerializeObject(new Dictionary<string, string>()
             {
                 {"username", username},
@@ -36,7 +38,7 @@ namespace GoogleDrivePaperlessImporter.Modules
 
             _client.DefaultRequestHeaders.Accept.Clear();
 
-            _client.DefaultRequestHeaders.Authorization = new("Token", token);
+            _client.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Token", token);
         }
 
         public void PostFile(string fileName, Stream fileStream)
@@ -48,16 +50,17 @@ namespace GoogleDrivePaperlessImporter.Modules
 
             try
             {
-                var message = _client.SendAsync(new(HttpMethod.Post, "/api/documents/post_document/")
+                var message = _client.SendAsync(new HttpRequestMessage(HttpMethod.Post, "/api/documents/post_document/")
                 {
                     Content = formContent
                 }).Result;
-                if (!message.IsSuccessStatusCode)
+                if (message.IsSuccessStatusCode)
                 {
-                    var content = message.StatusCode + ":" + message.Content.ReadAsStringAsync().Result;
-                    File.WriteAllText("error-"+DateTimeOffset.Now.ToString("s").Replace(":", "-"), content);
-                    throw new NotSupportedException(content);
+                    return;
                 }
+                var content = message.StatusCode + ":" + message.Content.ReadAsStringAsync().Result;
+                File.WriteAllText("error-"+DateTimeOffset.Now.ToString("s").Replace(":", "-"), content);
+                throw new NotSupportedException(content);
             }
             catch (Exception ex)
             {
