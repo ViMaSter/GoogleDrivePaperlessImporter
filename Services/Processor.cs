@@ -25,8 +25,7 @@ namespace GoogleDrivePaperlessImporter.Modules
             _sourceFolder = _googleDrive.FindFile("trashed = false AND name='paperless'");
             _processingFolder = _googleDrive.FindFile($"trashed = false AND name='processing' AND '{_googleDrive.FindFile("trashed = false AND name='paperless'").Id}' IN parents");
 
-            const string CONFIG_PATH = "config.json";
-            _pauseAfterCompletedList = TimeSpan.FromMinutes((double)options.PauseAfterCompletedListInMinutes);
+            _pauseAfterCompletedList = TimeSpan.FromMinutes(options.PauseAfterCompletedListInMinutes);
         }
 
         public bool HasFiles()
