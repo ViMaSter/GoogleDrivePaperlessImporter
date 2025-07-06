@@ -2,6 +2,7 @@
 using System.Threading.Tasks;
 using Google.Apis.Drive.v3.Data;
 using Newtonsoft.Json;
+using Prometheus;
 using Serilog;
 
 namespace GoogleDrivePaperlessImporter.Modules
@@ -57,6 +58,12 @@ namespace GoogleDrivePaperlessImporter.Modules
             _googleDrive.DeleteFile(nextFile);
         }
 
+        private static readonly Counter ChecksForNewFiles =
+            Metrics.CreateCounter("googledrive_scans", "Number of times Google Drive was scanned for new files");
+
+        private static readonly Counter ProcessedFiles =
+            Metrics.CreateCounter("googledrive_files_processed", "Number of files sent to Paperless and deleted from Google Drive");
+
         public Task Run()
         {
             return Task.Run(() =>
@@ -67,8 +74,10 @@ namespace GoogleDrivePaperlessImporter.Modules
                     while (HasFiles())
                     {
                         ProcessNextFile();
+                        ProcessedFiles.Inc();
                     }
                     _logger.Information("Next check at {Timestamp:yyyy-MM-dd HH:mm:ss.fff}", DateTime.Now.Add(_pauseAfterCompletedList));
+                    ChecksForNewFiles.Inc();
                     Task.Delay((int)_pauseAfterCompletedList.TotalMilliseconds).Wait();
                 }
                 // ReSharper disable once FunctionNeverReturns Justification: Intended infinite loop

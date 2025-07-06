@@ -5,6 +5,7 @@ using System;
 using System.ComponentModel.DataAnnotations;
 using System.IO;
 using GoogleDrivePaperlessImporter.Logging;
+using Prometheus;
 using Serilog.Core;
 
 namespace GoogleDrivePaperlessImporter
@@ -19,7 +20,21 @@ namespace GoogleDrivePaperlessImporter
                 .AddJsonFile("appsettings.json")
                 .Build();
 
-            using var log = CreateLogger(config.GetSection("Logging").Get<LoggingOptions>());
+            using var log = CreateLogger(config.GetSection("SeqLogging").Get<LoggingOptions>());
+
+            var metricsConfig = config.GetSection("Metrics").Get<MetricsOptions>();
+            KestrelMetricServer server = null;
+            if (metricsConfig is { Port: > 0 })
+            {
+                server = new Prometheus.KestrelMetricServer(port: metricsConfig.Port);
+                log.Information($"Metrics available at http://localhost:{metricsConfig.Port}/metrics");
+            }
+            else
+            {
+                log.Warning("No port for metrics configured; not exposing metrics");
+            }
+
+            server?.Start();
 
             log.Information("Initializing...");
             var drive = new GoogleDrive(log, config.GetSection("GoogleDrive").Get<GoogleOptions>());
@@ -28,6 +43,8 @@ namespace GoogleDrivePaperlessImporter
             log.Information("Starting...");
             var processor = new Processor(log, drive, paperless, config.GetSection("Processor").Get<ProcessorOptions>());
             processor.Run().Wait();
+
+            server?.Dispose();
         }
 
         private static Logger CreateLogger(LoggingOptions loggingOptions)
@@ -94,5 +111,10 @@ namespace GoogleDrivePaperlessImporter
 
         [Required]
         public string ApiKey { get; set; } = default!;
+    }
+    public class MetricsOptions
+    {
+        [Required]
+        public int Port { get; set; }
     }
 }
