@@ -9,14 +9,16 @@ namespace GoogleDrivePaperlessImporter.Modules
     {
         private readonly GoogleDrive _googleDrive;
         private readonly Paperless _paperless;
+        private readonly Backup _backup;
         private readonly File _sourceFolder;
         private readonly File _processingFolder;
         private readonly TimeSpan _pauseAfterCompletedList;
 
-        public Processor(GoogleDrive googleDrive, Paperless paperless)
+        public Processor(GoogleDrive googleDrive, Paperless paperless, Backup backup)
         {
             _googleDrive = googleDrive;
             _paperless = paperless;
+            _backup = backup;
 
             _sourceFolder = _googleDrive.FindFile("trashed = false AND name='paperless'");
             _processingFolder = _googleDrive.FindFile($"trashed = false AND name='processing' AND '{_googleDrive.FindFile("trashed = false AND name='paperless'").Id}' IN parents");
@@ -48,8 +50,9 @@ namespace GoogleDrivePaperlessImporter.Modules
         {
             var nextFile = _googleDrive.FindFile($"trashed = false AND name!='processing' AND '{_processingFolder.Id}' IN parents");
             var stream = _googleDrive.GetFileContents(nextFile);
+            _backup.StorePDF(nextFile.Name, stream);
             _paperless.PostFile(nextFile.Name, stream);
-            _googleDrive.DeleteFile(nextFile);
+            _googleDrive.TrashFile(nextFile);
         }
 
         public Task Run()

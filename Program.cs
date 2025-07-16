@@ -8,8 +8,9 @@ namespace GoogleDrivePaperlessImporter
         {
             var drive = new GoogleDrive();
             var paperless = new Paperless();
+            var backup = new Backup("backup");
 
-            var processor = new Processor(drive, paperless);
+            var processor = new Processor(drive, paperless, backup);
             processor.Run().Wait();
         }
     }
