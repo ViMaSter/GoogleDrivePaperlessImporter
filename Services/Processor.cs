@@ -54,7 +54,7 @@ namespace GoogleDrivePaperlessImporter.Modules
             var stream = _googleDrive.GetFileContents(nextFile);
             _logger.Information("Uploading to paperless: {FileName}...", nextFile.Name);
             _paperless.PostFile(nextFile.Name, stream);
-            _googleDrive.DeleteFile(nextFile);
+            _googleDrive.TrashFile(nextFile);
         }
 
         private static readonly Counter ChecksForNewFiles =
