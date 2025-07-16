@@ -101,7 +101,7 @@ namespace GoogleDrivePaperlessImporter.Modules
             var updatedFile = updateRequest.Execute();
             if (updatedFile == null || updatedFile.Trashed != true)
             {
-                throw new($"Trashing file '{file.Id}' failed.");
+                throw new($"Trashing file '{file.Id}' failed. Null: {updatedFile == null}, Trashed: {updatedFile?.Trashed}");
             }
         }
     }
