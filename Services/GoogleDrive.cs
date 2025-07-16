@@ -94,12 +94,14 @@ namespace GoogleDrivePaperlessImporter.Modules
             return request.ExecuteAsStream();
         }
 
-        public void DeleteFile(File file)
+        public void TrashFile(File file)
         {
-            var response = _driveService.Files.Delete(file.Id).Execute();
-            if (!string.IsNullOrWhiteSpace(response))
+            RefreshTokenIfRequired();
+            var updateRequest = _driveService.Files.Update(new File { Trashed = true }, file.Id);
+            var updatedFile = updateRequest.Execute();
+            if (updatedFile == null || updatedFile.Trashed != true)
             {
-                throw new Exception($"Deleting file '{file.Id}' failed: '{response}'");
+                throw new($"Trashing file '{file.Id}' failed.");
             }
         }
     }
